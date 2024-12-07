@@ -75,8 +75,8 @@ class EmotionCaptureApp:
 
         self.cap = None
         self.drive = authenticate_drive()
-        self.master_folder_id = "1MrST3Rg806Z8wZWPsLwlcJvxXYiOxPUs"  # Replace with your Google Drive master folder ID
-        self.destination_folder_id = "1N5iTZy_ozQboBifuBYDh435ItHhx4XHz"  # Replace with your Google Drive destination folder ID
+        self.master_folder_id = "1rGEyv8q6kR32mEhnrTo-jLjm8-t7u8Gn"  # Replace with your Google Drive master folder ID
+        self.destination_folder_id = "1Els1XBSz8ISC4qKJ0k2AuAJH1o5bGLwm"  # Replace with your Google Drive destination folder ID
 
     def start_camera(self):
         self.cap = cv2.VideoCapture(0)
@@ -109,6 +109,10 @@ class EmotionCaptureApp:
             cv2.imwrite(photo_path, frame)
 
             try:
+                # Upload photo to the master folder first
+                print("Uploading photo to master folder...")
+                upload_to_drive(self.drive, photo_path, folder_id=self.master_folder_id)
+
                 # Perform emotion analysis
                 result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
                 emotion = result[0]['dominant_emotion']
