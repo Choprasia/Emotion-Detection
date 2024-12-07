@@ -8,8 +8,6 @@ from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from PIL import Image, ImageTk
 
-
-
 def authenticate_drive():
     gauth = GoogleAuth()
     gauth.LoadClientConfigFile("C:\\Users\\Lenovo\\projects\\Emotion-Detection\\client_secret_984184219801-knv08mh4sneu7hh6id62f0qb37gf55gq.apps.googleusercontent.com.json")
@@ -18,32 +16,39 @@ def authenticate_drive():
 
 # Save image to Google Drive
 def upload_to_drive(drive, local_path, folder_id=None):
-    file = drive.CreateFile({"title": os.path.basename(local_path), "parents": [{"id": folder_id}] if folder_id else None})
-    file.SetContentFile(local_path)
-    file.Upload()
-    return file['id']
+    try:
+        print(f"Uploading file: {local_path} to folder ID: {folder_id}...")
+        file = drive.CreateFile({"title": os.path.basename(local_path), "parents": [{"id": folder_id}] if folder_id else None})
+        file.SetContentFile(local_path)
+        file.Upload()
+        print(f"File uploaded successfully. File ID: {file['id']}")
+        return file['id']
+    except Exception as e:
+        print(f"Error uploading file: {e}")
+        raise
 
-# Categorize and move file to emotion folder in destination folder
-def move_to_emotion_folder(drive, file_id, destination_folder_id, emotion):
-    # Log the operation
-    print(f"Checking for emotion folder: {emotion} in destination folder.")
-    
-    folder_list = drive.ListFile({'q': f"'{destination_folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder'"}).GetList()
-    emotion_folder = next((f for f in folder_list if f['title'] == emotion), None)
-    
-    if not emotion_folder:
-        print(f"Emotion folder '{emotion}' not found. Creating new folder.")
-        emotion_folder = drive.CreateFile({"title": emotion, "mimeType": "application/vnd.google-apps.folder", "parents": [{"id": destination_folder_id}]})
-        emotion_folder.Upload()
-        print(f"Created folder for emotion: {emotion}")
-    else:
-        print(f"Folder '{emotion}' already exists.")
-    
-    # Move the file to the created or existing folder
-    file = drive.CreateFile({'id': file_id})
-    file['parents'] = [{'id': emotion_folder['id']}]
-    file.Upload()
-    print(f"Moved file to {emotion} folder.")
+def get_or_create_emotion_folder(drive, emotion, parent_folder_id):
+    try:
+        print(f"Searching for folder '{emotion}' in parent folder ID: {parent_folder_id}...")
+        folder_list = drive.ListFile({'q': f"'{parent_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and title='{emotion}'"}).GetList()
+
+        if folder_list:
+            print(f"Folder '{emotion}' found. Using existing folder ID: {folder_list[0]['id']}")
+            return folder_list[0]['id']
+
+        print(f"Folder '{emotion}' not found. Creating new folder...")
+        folder_metadata = {
+            'title': emotion,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [{"id": parent_folder_id}]
+        }
+        folder = drive.CreateFile(folder_metadata)
+        folder.Upload()
+        print(f"Folder '{emotion}' created successfully. Folder ID: {folder['id']}")
+        return folder['id']
+    except Exception as e:
+        print(f"Error creating folder for emotion '{emotion}': {e}")
+        raise
 
 # Main Application with Tkinter frontend
 class EmotionCaptureApp:
@@ -71,7 +76,7 @@ class EmotionCaptureApp:
         self.cap = None
         self.drive = authenticate_drive()
         self.master_folder_id = "1MrST3Rg806Z8wZWPsLwlcJvxXYiOxPUs"  # Replace with your Google Drive master folder ID
-        self.destination_folder_id = "1Tiwrc9Y5-QIaBA3LmdNZ-6fP4zoitqn6"  # Replace with your Google Drive destination folder ID
+        self.destination_folder_id = "1N5iTZy_ozQboBifuBYDh435ItHhx4XHz"  # Replace with your Google Drive destination folder ID
 
     def start_camera(self):
         self.cap = cv2.VideoCapture(0)
@@ -109,12 +114,24 @@ class EmotionCaptureApp:
                 emotion = result[0]['dominant_emotion']
                 self.output_label.config(text=f"Emotion Detected: {emotion}")
 
-                # Upload photo to Google Drive and categorize it into emotion folder
-                file_id = upload_to_drive(self.drive, photo_path, folder_id=self.master_folder_id)
-                move_to_emotion_folder(self.drive, file_id, self.destination_folder_id, emotion)
+                # Categorize and upload photo to Google Drive
+                self.categorize_and_upload(photo_path, emotion)
+
                 os.remove(photo_path)  # Clean up local file
             except Exception as e:
                 messagebox.showerror("Error", f"Error processing photo: {e}")
+
+    def categorize_and_upload(self, photo_path, emotion):
+        try:
+            # Get or create a folder for the emotion
+            emotion_folder_id = get_or_create_emotion_folder(self.drive, emotion, self.destination_folder_id)
+
+            # Upload the image to the emotion folder
+            upload_to_drive(self.drive, photo_path, folder_id=emotion_folder_id)
+            print(f"Photo categorized under '{emotion}' and uploaded successfully.")
+        except Exception as e:
+            print(f"Error categorizing and uploading photo: {e}")
+            raise
 
     def stop_camera(self):
         if self.cap is not None:
