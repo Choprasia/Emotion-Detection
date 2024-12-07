@@ -8,7 +8,8 @@ from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from PIL import Image, ImageTk
 
-# Authenticate Google Drive
+
+
 def authenticate_drive():
     gauth = GoogleAuth()
     gauth.LoadClientConfigFile("C:\\Users\\Lenovo\\projects\\Emotion-Detection\\client_secret_984184219801-knv08mh4sneu7hh6id62f0qb37gf55gq.apps.googleusercontent.com.json")
